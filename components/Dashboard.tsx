@@ -647,26 +647,35 @@ const Dashboard: React.FC<DashboardProps> = ({ data }) => {
     if (!aiSummary?.summary) {
         return { summaryText: '', insights: [] };
     }
-    const summaryString = aiSummary.summary;
-    const bulletMarkers = ['\n*', '\n-'];
-    let splitIndex = -1;
+    const summaryString = aiSummary.summary.trim();
 
-    for (const marker of bulletMarkers) {
-        const index = summaryString.indexOf(marker);
-        if (index !== -1) {
-            splitIndex = index;
-            break;
-        }
+    // Split the entire string by bullet points (asterisk or dash).
+    // The regex uses a positive lookahead (?=...) to split *before* the bullet,
+    // keeping the bullet character in the resulting parts. This is crucial
+    // for identifying which parts are list items.
+    const parts = summaryString.split(/(?=\n?\s*[\*\-]\s)/).filter(p => p.trim());
+    
+    if (parts.length === 0) {
+        return { summaryText: '', insights: [] };
     }
 
-    if (splitIndex === -1) {
-        return { summaryText: summaryString, insights: [] };
+    if (parts.length === 1) {
+        // No bullets found, so it's all a single summary text.
+        return { summaryText: parts[0], insights: [] };
     }
+
+    // Check if the first part is an introductory paragraph or just another bullet point.
+    // An intro paragraph will not start with a bullet.
+    const firstPartIsIntro = !parts[0].trim().startsWith('*') && !parts[0].trim().startsWith('-');
     
-    const summaryText = summaryString.substring(0, splitIndex).trim();
-    const insightsText = summaryString.substring(splitIndex).trim();
-    const insights = insightsText.split(/\n\s*[\*\-]\s*/).filter(insight => insight.trim() !== '');
-    
+    const summaryText = firstPartIsIntro ? parts[0].trim() : '';
+    const insightsRaw = firstPartIsIntro ? parts.slice(1) : parts;
+
+    // Clean up the insights: remove the bullet point characters from the beginning of each.
+    const insights = insightsRaw
+      .map(insight => insight.trim().replace(/^[\*\-]\s*/, '').trim())
+      .filter(Boolean); // Filter out any empty strings that might result
+
     return { summaryText, insights };
 
   }, [aiSummary?.summary]);
